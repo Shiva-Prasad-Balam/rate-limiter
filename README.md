@@ -42,3 +42,12 @@ Instead of fixed time buckets (which suffer from boundary spike issues), this im
 ```bash
 docker run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
 ```
+#### 2. Build & Run the Application
+```bash
+./mvnw clean spring-boot:run
+```
+🧪 Testing the API
+Success Request
+```bash
+curl -i http://localhost:8080/test/api
+```
