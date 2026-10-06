@@ -18,8 +18,8 @@ Instead of fixed time buckets (which suffer from boundary spike issues), this im
 2. **Range Cleanup:** Removes entries from Redis ZSET older than `currentTime - 60s`.
 3. **Cardinality Check (`ZCARD`):** Counts valid requests in the active window.
 4. **Decision:**
-    * If `count >= MAX_REQUESTS (5)` $\rightarrow$ Returns HTTP `429 Too Many Requests`.
-    * Else $\rightarrow$ Records the timestamped UUID member, refreshes TTL (60s), and allows the request through.
+   * If `count >= MAX_REQUESTS (5)` -> Returns HTTP `429 Too Many Requests`.
+   * Else -> Records the timestamped UUID member, refreshes TTL (60s), and allows the request through.
 
 ---
 
@@ -42,12 +42,30 @@ Instead of fixed time buckets (which suffer from boundary spike issues), this im
 ```bash
 docker run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
 ```
-#### 2. Build & Run the Application
+
+### 2. Build & Run Application
 ```bash
 ./mvnw clean spring-boot:run
 ```
-🧪 Testing the API
-Success Request
+
+---
+
+## 🧪 Testing the API
+
+### Successful Request
 ```bash
 curl -i http://localhost:8080/test/api
+```
+
+### Triggering Rate Limit (6 Sequential Requests)
+```bash
+for i in {1..6}; do curl -i http://localhost:8080/test/api; echo ""; done
+```
+
+**Expected Response on 6th Request:**
+```http
+HTTP/1.1 429 
+Content-Type: text/plain;charset=UTF-8
+
+Rate limit exceeded. Please try again later.
 ```
