@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.io.PrintWriter;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -22,8 +24,11 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         if (rateLimitService.isRateLimitExceeded(clientIp)) {
             response.setStatus(429);
-            response.setContentType("text/plain");
-            response.getWriter().write("Rate limit exceeded. Please try again later.");
+            response.setContentType("text/plain;charset=UTF-8");
+
+            PrintWriter writer = response.getWriter();
+            writer.write("Rate limit exceeded. Please try again later.");
+            writer.flush();
             return false;
         }
 
@@ -33,7 +38,6 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private String extractClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            // Take the first IP if forwarded through multiple proxies
             return xForwardedFor.split(",")[0].trim();
         }
         return request.getRemoteAddr();
