@@ -33,7 +33,7 @@ public class RateLimitServiceImpl implements RateLimitService {
         }
 
         // 3. Add current request with UNIQUE member value
-        String memberValue = currentTimeStamp + "-" + UUID.randomUUID().toString();
+        String memberValue = currentTimeStamp + "-" + UUID.randomUUID();
         redisTemplate.opsForZSet().add(clientIp, memberValue, currentTimeStamp);
 
         // 4. Reset key TTL
