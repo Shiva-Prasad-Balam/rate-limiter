@@ -1,34 +1,27 @@
 # Distributed Rate Limiter & Audit Logger
 
-A high-performance, distributed rate-limiting system built with **Spring Boot 3** and **Redis Sorted Sets (ZSET)** using the **Sliding Window Log** algorithm.
-
----
+A high-performance, distributed rate-limiting system built with **Spring Boot 3** and **Redis Sorted Sets (ZSET)** using the **Sliding Window Log** algorithm, coupled with **RabbitMQ** for asynchronous audit logging.
 
 ## 📌 Architecture & Design
 
-### Sliding Window Log via Redis ZSET
+### 1. Sliding Window Log via Redis ZSET
 Instead of fixed time buckets (which suffer from boundary spike issues), this implementation tracks request timestamps within a continuous 60-second sliding window.
-
 * **Redis Key:** Client IP (or User ID)
 * **Redis Score:** Request Timestamp (`Epoch Milliseconds`)
-* **Redis Member:** Unique string formatted as `<timestamp>-<UUID>` to prevent member collisions when multiple requests occur within the exact same millisecond.
+* **Redis Member:** Unique string formatted as `<timestamp>-<UUID>` to prevent member collisions.
 
-### Request Flow
-1. **Interceptor (`RateLimitInterceptor`):** Intercepts incoming HTTP requests, extracts the real client IP (handling `X-Forwarded-For` proxy headers), and queries the rate limit service.
-2. **Range Cleanup:** Removes entries from Redis ZSET older than `currentTime - 60s`.
-3. **Cardinality Check (`ZCARD`):** Counts valid requests in the active window.
-4. **Decision:**
-   * If `count >= MAX_REQUESTS (5)` -> Returns HTTP `429 Too Many Requests`.
-   * Else -> Records the timestamped UUID member, refreshes TTL (60s), and allows the request through.
+### 2. Asynchronous Event-Driven Audit Logging
+* **Producer:** `RateLimitInterceptor` publishes request metadata (IP, endpoint, method, status, payload) asynchronously via `RabbitTemplate` to a RabbitMQ Direct Exchange.
+* **Consumer:** `@RabbitListener` consumes logs off the queue in the background, decoupling disk/DB I/O from the critical HTTP request path to maintain low latency.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Java:** 21 / 25
-* **Framework:** Spring Boot 3.x (Spring MVC, Web)
-* **In-Memory Store:** Redis (`StringRedisTemplate`)
-* **Utilities:** Lombok
+* **Language:** Java 21
+* **Framework:** Spring Boot 3.x (Spring MVC, AMQP)
+* **Datastore / In-Memory:** Redis Stack (`StringRedisTemplate`), RabbitMQ
+* **Utilities:** Lombok, Maven
 
 ---
 
@@ -40,7 +33,14 @@ Instead of fixed time buckets (which suffer from boundary spike issues), this im
 
 ### 1. Run Redis Container
 ```bash
+# 1. Stop and remove existing containers
+docker rm -f redis-stack rabbitmq
+# 2. Run them again
+# Run Redis Stack
 docker run -d --name redis-stack -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+
+# Run RabbitMQ with Management UI
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 ```
 
 ### 2. Build & Run Application
@@ -66,6 +66,8 @@ for i in {1..6}; do curl -i http://localhost:8080/test/api; echo ""; done
 ```http
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
+Transfer-Encoding: chunked
+Date: Fri, 16 Oct 2026 05:49:17 GMT
 
 Rate limit exceeded. Please try again later.
 ```
